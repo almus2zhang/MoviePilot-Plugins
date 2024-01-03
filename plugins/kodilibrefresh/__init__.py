@@ -24,7 +24,7 @@ class MediaServerRefresh(_PluginBase):
     # 插件图标
     plugin_icon = "Kodi_A.png"
     # 插件版本
-    plugin_version = "1.1"
+    plugin_version = "1.0"
     # 插件作者
     plugin_author = "almus"
     # 作者主页
@@ -34,7 +34,7 @@ class MediaServerRefresh(_PluginBase):
     # 加载顺序
     plugin_order = 14
     # 可使用的用户级别
-    auth_level = 2
+    auth_level = 1
 
     # 私有属性
     _enabled = False
