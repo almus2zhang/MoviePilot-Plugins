@@ -2,9 +2,9 @@
     "KodiLibRefresh": {
         "name": "KODI库刷新",
         "description": "媒体库更新后同步让KODI刷新库",
-        "version": "1.1",
+        "version": "1.0",
         "icon": "Kodi_A.png",
         "author": "almus",
-        "level": 2
+        "level": 1
     }
 }
