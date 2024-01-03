@@ -164,7 +164,7 @@ class MediaServerRefresh(_PluginBase):
             result = opener.open(req)
             messages = result.read()
             print (messages)
-         except IOError as e:
+        except IOError as e:
             print (e)
     def stop_service(self):
         """
