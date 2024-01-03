@@ -1,4 +1,7 @@
 import time
+import urllib.request
+import urllib.response
+
 from typing import Any, List, Dict, Tuple
 
 from app.core.config import settings
@@ -156,7 +159,25 @@ class MediaServerRefresh(_PluginBase):
         # Plex
         if "plex" in settings.MEDIASERVER:
             Plex().refresh_library_by_items(items)
+        userName = "admin"
+        passWord  = "5b6cs1"
+        top_level_url = "http://192.168.10.186:8080/jsonrpc"
+        p = urllib.request.HTTPPasswordMgrWithDefaultRealm()
+        p.add_password(None, top_level_url, userName, passWord);
 
+        auth_handler = urllib.request.HTTPBasicAuthHandler(p)
+        opener = urllib.request.build_opener(auth_handler)
+
+        urllib.request.install_opener(opener)
+
+        DATA = b'{"jsonrpc": "2.0", "method": "VideoLibrary.Scan", "id": "1"}'
+        try:
+            req = urllib.request.Request('http://192.168.10.186:8080/jsonrpc', data=DATA, headers={'Content-Type': 'application/json'})    
+            result = opener.open(req)
+            messages = result.read()
+            print (messages)
+         except IOError as e:
+            print (e)
     def stop_service(self):
         """
         退出插件
