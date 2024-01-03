@@ -159,8 +159,8 @@ class MediaServerRefresh(_PluginBase):
         # Plex
         if "plex" in settings.MEDIASERVER:
             Plex().refresh_library_by_items(items)
-        userName = "admin"
-        passWord  = ""
+        userName = settings.SUPERUSER
+        passWord  = settings.SUPERUSER_PASSWORD
         top_level_url = "http://192.168.10.186:8080/jsonrpc"
         p = urllib.request.HTTPPasswordMgrWithDefaultRealm()
         p.add_password(None, top_level_url, userName, passWord);
