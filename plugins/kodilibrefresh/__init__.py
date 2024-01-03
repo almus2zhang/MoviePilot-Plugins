@@ -22,7 +22,7 @@ class MediaServerRefresh(_PluginBase):
     # 插件描述
     plugin_desc = "媒体库更新后同步让KODI刷新库"
     # 插件图标
-    plugin_icon = "kodi.png"
+    plugin_icon = "Kodi_A.png"
     # 插件版本
     plugin_version = "1.0"
     # 插件作者
