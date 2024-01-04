@@ -44,6 +44,8 @@ class MediaServerRefresh(_PluginBase):
         if config:
             self._enabled = config.get("enabled")
             self._delay = config.get("delay") or 0
+            self._kodiuser = config.get("kodiuser")
+            self._kodipass = config.get("kodipass")
 
     def get_state(self) -> bool:
         return self._enabled
@@ -104,6 +106,48 @@ class MediaServerRefresh(_PluginBase):
                                 ]
                             }
                         ]
+                    },
+                    {
+                        'component': 'VRow',
+                        'content': [
+                            {
+                                'component': 'VCol',
+                                'props': {
+                                    'cols': 12,
+                                },
+                                'content': [
+                                    {
+                                        'component': 'VTextField',
+                                        'props': {
+                                            'model': 'kodiuser',
+                                            'label': 'Kodi用户名',
+                                            'placeholder': 'admin'
+                                        }
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        'component': 'VRow',
+                        'content': [
+                            {
+                                'component': 'VCol',
+                                'props': {
+                                    'cols': 12,
+                                },
+                                'content': [
+                                    {
+                                        'component': 'VTextField',
+                                        'props': {
+                                            'model': 'kodipass',
+                                            'label': 'Kodi密码',
+                                            'placeholder': 'pass'
+                                        }
+                                    }
+                                ]
+                            }
+                        ]
                     }
                 ]
             }
@@ -147,8 +191,14 @@ class MediaServerRefresh(_PluginBase):
                 target_path=transferinfo.target_path
             )
         ]
-        userName = settings.SUPERUSER
-        passWord  = settings.SUPERUSER_PASSWORD
+        if self._kodiuser:
+            userName = self._kodiuser
+        else: 
+            userName = 'admin'
+        if self._kodipass:	  
+            passWord = self._kodipass
+        else: 
+            passWord = 'pass'
         top_level_url = "http://192.168.10.186:8080/jsonrpc"
         p = urllib.request.HTTPPasswordMgrWithDefaultRealm()
         p.add_password(None, top_level_url, userName, passWord);
