@@ -213,9 +213,9 @@ class MediaServerRefresh(_PluginBase):
             req = urllib.request.Request('http://192.168.10.186:8080/jsonrpc', data=DATA, headers={'Content-Type': 'application/json'})    
             result = opener.open(req)
             messages = result.read()
-            print (messages)
+            logger.info(messages)
         except IOError as e:
-            print (e)
+            logger.warn(e)
     def stop_service(self):
         """
         退出插件
