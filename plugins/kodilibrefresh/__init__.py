@@ -44,6 +44,7 @@ class MediaServerRefresh(_PluginBase):
         if config:
             self._enabled = config.get("enabled")
             self._delay = config.get("delay") or 0
+            self._kodiserver = config.get("kodiserver")
             self._kodiuser = config.get("kodiuser")
             self._kodipass = config.get("kodipass")
 
@@ -199,7 +200,11 @@ class MediaServerRefresh(_PluginBase):
             passWord = self._kodipass
         else: 
             passWord = 'pass'
-        top_level_url = "http://192.168.10.186:8080/jsonrpc"
+        if self._kodiserver:
+            top_level_url = self._kodiserver
+            #"http://192.168.10.186:8080/jsonrpc"
+        else:
+            return
         p = urllib.request.HTTPPasswordMgrWithDefaultRealm()
         p.add_password(None, top_level_url, userName, passWord);
 
@@ -210,7 +215,7 @@ class MediaServerRefresh(_PluginBase):
 
         DATA = b'{"jsonrpc": "2.0", "method": "VideoLibrary.Scan", "id": "1"}'
         try:
-            req = urllib.request.Request('http://192.168.10.186:8080/jsonrpc', data=DATA, headers={'Content-Type': 'application/json'})    
+            req = urllib.request.Request(self._kodiserver, data=DATA, headers={'Content-Type': 'application/json'})    
             result = opener.open(req)
             messages = result.read()
             logger.info(messages)
