@@ -2,7 +2,13 @@ import time
 import urllib.request
 import urllib.response
 
-from typing import Any, List, Dict, Tuple
+from typing import Any, List, Dict, Tuple, Optional
+from datetime import datetime, timedelta
+from pathlib import Path
+
+import pytz
+from apscheduler.schedulers.background import BackgroundScheduler
+
 
 from app.core.config import settings
 from app.core.context import MediaInfo
@@ -38,7 +44,9 @@ class KodiLibRefresh(_PluginBase):
 
     # 私有属性
     _enabled = False
+    _onlyonce = False
     _delay = 0
+    _scheduler: Optional[BackgroundScheduler] = None
 
     def init_plugin(self, config: dict = None):
         if config:
@@ -47,7 +55,30 @@ class KodiLibRefresh(_PluginBase):
             self._kodiserver = config.get("kodiserver")
             self._kodiuser = config.get("kodiuser")
             self._kodipass = config.get("kodipass")
+            self._onlyonce = config.get("onlyonce")
+        if self._enabled:
 
+            self._scheduler = BackgroundScheduler(timezone=settings.TZ)
+            if self._onlyonce:
+                logger.info(f"KODI库刷新，立即运行一次")
+                self._scheduler.add_job(func=self.runonce, trigger='date',
+                                        run_date=datetime.now(tz=pytz.timezone(settings.TZ)) + timedelta(seconds=3),
+                                        name='KODIRefresh')
+                self._onlyonce = False
+                self.update_config({
+                    "onlyonce": False,
+                    "enabled": self._enabled,
+                    "delay": self._delay,
+                    "kodiserver": self._kodiserver,
+                    "kodiuser": self._kodiuser,
+                    "kodipass": self._kodipass,
+                })
+
+            # 启动任务
+            if self._scheduler.get_jobs():
+                self._scheduler.print_jobs()
+                self._scheduler.start()
+                
     def get_state(self) -> bool:
         return self._enabled
 
@@ -81,6 +112,22 @@ class KodiLibRefresh(_PluginBase):
                                         'props': {
                                             'model': 'enabled',
                                             'label': '启用插件',
+                                        }
+                                    }
+                                ]
+                            },
+                            {
+                                'component': 'VCol',
+                                'props': {
+                                    'cols': 12,
+                                    'md': 6
+                                },
+                                'content': [
+                                    {
+                                        'component': 'VSwitch',
+                                        'props': {
+                                            'model': 'onlyonce',
+                                            'label': '立即运行一次',
                                         }
                                     }
                                 ]
@@ -180,39 +227,11 @@ class KodiLibRefresh(_PluginBase):
 
     def get_page(self) -> List[dict]:
         pass
-
-    @eventmanager.register(EventType.TransferComplete)
-    def refresh(self, event: Event):
-        """
-        发送通知消息
-        """
+    def runonce(self):
         if not self._enabled:
+            logger.warn("kodi refresh not enable");
             return
 
-        event_info: dict = event.event_data
-        if not event_info:
-            return
-
-        # 刷新媒体库
-        if not settings.MEDIASERVER:
-            return
-
-        if self._delay:
-            logger.info(f"延迟 {self._delay} 秒后刷新媒体库... ")
-            time.sleep(float(self._delay))
-
-        # 入库数据
-        transferinfo: TransferInfo = event_info.get("transferinfo")
-        mediainfo: MediaInfo = event_info.get("mediainfo")
-        items = [
-            RefreshMediaItem(
-                title=mediainfo.title,
-                year=mediainfo.year,
-                type=mediainfo.type,
-                category=mediainfo.category,
-                target_path=transferinfo.target_path
-            )
-        ]
         if self._kodiuser:
             userName = self._kodiuser
         else: 
@@ -225,6 +244,7 @@ class KodiLibRefresh(_PluginBase):
             top_level_url = self._kodiserver
             #"http://192.168.10.186:8080/jsonrpc"
         else:
+            logger.warn("kodi server not set")
             return
         p = urllib.request.HTTPPasswordMgrWithDefaultRealm()
         p.add_password(None, top_level_url, userName, passWord);
@@ -252,9 +272,29 @@ class KodiLibRefresh(_PluginBase):
             logger.info("kodi clean return")
             logger.info(messages)
         except IOError as e:
-            logger.warn(e)    
+            logger.warn(e)   
+            
+    @eventmanager.register(EventType.TransferComplete)
+    def refresh(self, event: Event):
+        """
+        发送通知消息
+        """
+        if not self._enabled:
+            logger.warn("kodi refresh not enable");
+            return
+        if self._delay:
+            logger.info(f"延迟 {self._delay} 秒后刷新KODI库... ")
+            time.sleep(float(self._delay))    
+        self.runonce()
     def stop_service(self):
         """
         退出插件
         """
-        pass
+        try:
+            if self._scheduler:
+                self._scheduler.remove_all_jobs()
+                if self._scheduler.running:
+                    self._scheduler.shutdown()
+                self._scheduler = None
+        except Exception as e:
+            logger.error("退出插件失败：%s" % str(e))
