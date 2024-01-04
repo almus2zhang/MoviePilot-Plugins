@@ -149,6 +149,27 @@ class MediaServerRefresh(_PluginBase):
                                 ]
                             }
                         ]
+                    },
+                    {
+                        'component': 'VRow',
+                        'content': [
+                            {
+                                'component': 'VCol',
+                                'props': {
+                                    'cols': 12,
+                                },
+                                'content': [
+                                    {
+                                        'component': 'VTextField',
+                                        'props': {
+                                            'model': 'kodiserver',
+                                            'label': 'Kodi地址',
+                                            'placeholder': 'http://127.0.0.1:8080'
+                                        }
+                                    }
+                                ]
+                            }
+                        ]
                     }
                 ]
             }
