@@ -164,7 +164,7 @@ class KodiLibRefresh(_PluginBase):
                                         'props': {
                                             'model': 'kodiserver',
                                             'label': 'Kodi地址',
-                                            'placeholder': 'http://127.0.0.1:8080'
+                                            'placeholder': 'http://127.0.0.1:8080/jsonrpc'
                                         }
                                     }
                                 ]
