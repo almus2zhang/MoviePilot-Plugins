@@ -16,7 +16,7 @@ from app.schemas.types import EventType
 from app.log import logger
 
 
-class MediaServerRefresh(_PluginBase):
+class KodiLibRefresh(_PluginBase):
     # 插件名称
     plugin_name = "KODI库刷新"
     # 插件描述
