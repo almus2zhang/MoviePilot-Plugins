@@ -239,9 +239,20 @@ class KodiLibRefresh(_PluginBase):
             req = urllib.request.Request(self._kodiserver, data=DATA, headers={'Content-Type': 'application/json'})    
             result = opener.open(req)
             messages = result.read()
+            logger.info("kodi refresh return")
             logger.info(messages)
         except IOError as e:
             logger.warn(e)
+            
+        DATA = b'{"jsonrpc": "2.0", "method": "VideoLibrary.Clean", "id": "1"}'
+        try:
+            req = urllib.request.Request(self._kodiserver, data=DATA, headers={'Content-Type': 'application/json'})    
+            result = opener.open(req)
+            messages = result.read()
+            logger.info("kodi clean return")
+            logger.info(messages)
+        except IOError as e:
+            logger.warn(e)    
     def stop_service(self):
         """
         退出插件
