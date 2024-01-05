@@ -56,6 +56,7 @@ class KodiLibRefresh(_PluginBase):
             self._kodiuser = config.get("kodiuser")
             self._kodipass = config.get("kodipass")
             self._onlyonce = config.get("onlyonce")
+            self._kodiclean = config.get("kodiclean")
         if self._enabled:
 
             self._scheduler = BackgroundScheduler(timezone=settings.TZ)
@@ -72,6 +73,7 @@ class KodiLibRefresh(_PluginBase):
                     "kodiserver": self._kodiserver,
                     "kodiuser": self._kodiuser,
                     "kodipass": self._kodipass,
+                    "kodiclean": self._kodiclean,
                 })
 
             # 启动任务
@@ -104,7 +106,7 @@ class KodiLibRefresh(_PluginBase):
                                 'component': 'VCol',
                                 'props': {
                                     'cols': 12,
-                                    'md': 6
+                                    'md': 4
                                 },
                                 'content': [
                                     {
@@ -120,7 +122,23 @@ class KodiLibRefresh(_PluginBase):
                                 'component': 'VCol',
                                 'props': {
                                     'cols': 12,
-                                    'md': 6
+                                    'md': 4
+                                },
+                                'content': [
+                                    {
+                                        'component': 'VSwitch',
+                                        'props': {
+                                            'model': 'kodiclean',
+                                            'label': '清除无效资源',
+                                        }
+                                    }
+                                ]
+                            },
+                            {
+                                'component': 'VCol',
+                                'props': {
+                                    'cols': 12,
+                                    'md': 4
                                 },
                                 'content': [
                                     {
@@ -259,20 +277,20 @@ class KodiLibRefresh(_PluginBase):
             req = urllib.request.Request(self._kodiserver, data=DATA, headers={'Content-Type': 'application/json'})    
             result = opener.open(req)
             messages = result.read()
-            logger.info("kodi refresh return")
+            logger.info(f"kodi刷新命令返回信息:")
             logger.info(messages)
         except IOError as e:
             logger.warn(e)
-            
-        DATA = b'{"jsonrpc": "2.0", "method": "VideoLibrary.Clean", "id": "1"}'
-        try:
-            req = urllib.request.Request(self._kodiserver, data=DATA, headers={'Content-Type': 'application/json'})    
-            result = opener.open(req)
-            messages = result.read()
-            logger.info("kodi clean return")
-            logger.info(messages)
-        except IOError as e:
-            logger.warn(e)   
+        if self._kodiclean:
+            DATA = b'{"jsonrpc": "2.0", "method": "VideoLibrary.Clean", "id": "1"}'
+            try:
+                req = urllib.request.Request(self._kodiserver, data=DATA, headers={'Content-Type': 'application/json'})    
+                result = opener.open(req)
+                messages = result.read()
+                logger.info("kodi清理命令返回信息:")
+                logger.info(messages)
+            except IOError as e:
+                logger.warn(e)   
             
     @eventmanager.register(EventType.TransferComplete)
     def refresh(self, event: Event):
