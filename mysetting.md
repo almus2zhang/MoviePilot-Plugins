@@ -1,8 +1,8 @@
 # 我的MP设定说明
-我才用docker部署方式，环境变量尽量减少，配置在app.env里面。
+我采用docker部署方式，环境变量尽量减少，配置在app.env里面。
 
 ## 目录设定：
-我的目录架构如下
+- 我的目录架构如下
 ![[Pasted image 20240106112836.png]]
 movie4宿主机目录为/volume4/movie4
 其中movie4/video下面的目录是下载目录。
