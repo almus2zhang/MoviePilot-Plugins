@@ -3,7 +3,7 @@
 
 ## 目录设定：
 - 我的目录架构如下
-![[Pasted image 20240106112836.png]]
+![[folder.png]]
 movie4宿主机目录为/volume4/movie4
 其中movie4/video下面的目录是下载目录。
 movie4/nastoollink目录是整理后的媒体目录。
