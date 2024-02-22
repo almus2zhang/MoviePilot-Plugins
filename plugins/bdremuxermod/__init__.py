@@ -56,7 +56,7 @@ class BDRemuxermod(_PluginBase):
     _path = ""
     _delaymin = 0
     _scheduler: Optional[BackgroundScheduler] = None
-
+    _mkvfile = ""
     def init_plugin(self, config: dict = None):
         if config:
             self._enabled = config.get("enabled")
@@ -231,11 +231,11 @@ class BDRemuxermod(_PluginBase):
         logger.info('开始提取BDMV。')
         output_name = os.path.basename(bd_path) + ".mkv"
         output_name = os.path.join(bd_path, output_name)
-        bd_path = bd_path + '/BDMV'
-        if not os.path.exists(bd_path):
+        bdmv_path = bd_path + '/BDMV'
+        if not os.path.exists(bdmv_path):
             logger.info('失败。输入路径不存在BDMV文件夹')
             return
-        mpls_path = bd_path + '/PLAYLIST/'
+        mpls_path = bd_path + '/BDMV' + '/PLAYLIST/'
         if not os.path.exists(mpls_path):
             logger.info('失败。找不到PLAYLIST文件夹')
             return
@@ -246,6 +246,9 @@ class BDRemuxermod(_PluginBase):
         logger.info('输出文件：' + output_name)
         if os.path.exists(output_name):
             logger.info('失败。输出文件已存在' + output_name)
+            return
+        if self.check_files(bd_path,'mkv'):
+            logger.info('失败。文件已存在' + self._mkvfile)
             return
         filelist_string = '\n'.join([f"file '{file}'" for file in file_paths])
         # 将filelist_string写入filelist.txt
@@ -346,6 +349,16 @@ class BDRemuxermod(_PluginBase):
     def schedlerremux(self,bd_path : str):
         thread = threading.Thread(target=self.extract, args=(bd_path,))
         thread.start()
+    def check_files(self,directory, extension):
+        files = os.listdir(directory)
+        for file in files:
+            if file.endswith('.' + extension):
+                logger.info("目录" + directory + "中包含了后缀为." + extension + "的文件")
+                self._mkvfile = file
+                return True
+    
+        logger.info("目录" + directory + "中不存在后缀为." + extension + "的文件")
+        return False    
     @eventmanager.register(EventType.TransferComplete)
     def remuxer(self, event):
         if not self._enabled:
@@ -389,7 +402,7 @@ class BDRemuxermod(_PluginBase):
         # 延时提取
         logger.warn('延时' + self._delaymin + '分钟处理蓝光原盘目录: ' + bd_path)
         self._scheduler.add_job(self.schedlerremux, 'date', 
-                                run_date=datetime.now(tz=pytz.timezone(settings.TZ)) + timedelta(minutes=self._delaymin),
+                                run_date=datetime.now(tz=pytz.timezone(settings.TZ)) + timedelta(minutes=float(self._delaymin)),
                                 args=(bd_path,))
         # 启动任务
         if self._scheduler.get_jobs():
