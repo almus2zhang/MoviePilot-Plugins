@@ -389,7 +389,7 @@ class BDRemuxermod(_PluginBase):
         # 延时提取
         logger.warn('延时' + self._delaymin + '分钟处理蓝光原盘目录: ' + bd_path)
         self._scheduler.add_job(self.schedlerremux, 'date', 
-                                run_date=datetime.now(tz=pytz.timezone(settings.TZ)) + timedelta(hours=self._delaymin),
+                                run_date=datetime.now(tz=pytz.timezone(settings.TZ)) + timedelta(minutes=self._delaymin),
                                 args=(bd_path,))
         # 启动任务
         if self._scheduler.get_jobs():
