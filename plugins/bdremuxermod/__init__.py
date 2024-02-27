@@ -1,6 +1,7 @@
 
 # MoviePilot library
 from app.log import logger
+from pathlib import Path
 from app.plugins import _PluginBase
 from app.core.event import eventmanager
 from app.schemas.types import EventType
@@ -21,7 +22,6 @@ try:
 except:
     subprocess.run(["pip3", "install", "pyparsebluray"])
     subprocess.run(["pip3", "install", "ffmpeg-python"])
-    
 try:
     import ffmpeg
 except:
@@ -69,7 +69,7 @@ class BDRemuxermod(_PluginBase):
             logger.info("BD Remuxer 插件初始化完成")
             if self._run_once:
                 logger.info("添加任务10秒后处理目录：" + self._path)
-                self._scheduler.add_job(self.schedlerremux, 'date', 
+                self._scheduler.add_job(self.schedlerremux_sub, 'date', 
                                         run_date=datetime.now(tz=pytz.timezone(settings.TZ)) + timedelta(seconds=10),
                                         args=(self._path,))
                 # 启动任务
@@ -159,7 +159,7 @@ class BDRemuxermod(_PluginBase):
                                             'model': 'path',
                                             'label': '手动指定BDMV文件夹路径',
                                             'rows': 1,
-                                            'placeholder': '路径指向BDMV父文件夹',
+                                            'placeholder': '路径指向BDMV父文件夹 结尾加/ A会遍历所有子目录处理',
                                         }
                                     }
                                 ]
@@ -226,7 +226,23 @@ class BDRemuxermod(_PluginBase):
 
     def get_page(self) -> List[dict]:
         pass
-    
+    def extract_sub(self,path : str):
+        if path.endswith('/ A'):
+            # 获取所有子目录
+            newpath = path[:-2]
+            logger.info('处理所有子目录：' + newpath)
+            sub_dirs = os.listdir( newpath )
+            # 输出结果
+            for file in sub_dirs:
+                allfile = newpath+file
+                logger.info('处理目录：' + allfile)
+                self.extract(allfile)
+                if not self._enabled:
+                  logger.info('未使能，中断处理')
+                  return
+        else:
+            logger.info('处理单独目录：' + path)
+            self.extract(path)
     def extract(self,bd_path : str):
         logger.info('开始提取BDMV。')
         output_name = os.path.basename(bd_path) + ".mkv"
@@ -239,7 +255,9 @@ class BDRemuxermod(_PluginBase):
         if not os.path.exists(mpls_path):
             logger.info('失败。找不到PLAYLIST文件夹')
             return
-        file_paths = self.get_all_m2ts(mpls_path)
+        #file_paths = self.get_all_m2ts(mpls_path)
+        mpls_path = bd_path + '/BDMV' + '/STREAM/'
+        file_paths = self.get_max_m2ts(mpls_path)
         if not file_paths:
             logger.info('失败。找不到m2ts文件')
             return
@@ -250,15 +268,24 @@ class BDRemuxermod(_PluginBase):
         if self.check_files(bd_path,'mkv'):
             logger.info('失败。文件已存在' + self._mkvfile)
             return
-        filelist_string = '\n'.join([f"file '{file}'" for file in file_paths])
+        #filelist_string = '\n'.join([f"file '{file}'" for file in file_paths])
+        # 将filelist_string写入filelist.txt
+        #logger.info('搜索到需要提取的m2ts文件: ' + filelist_string)
+        #with open('/tmp/filelist.txt', 'w') as file:
+        #    file.write(filelist_string)
+            
+        # 提取流程
+        # 分析m2ts文件，提取视频流和音频流信息
+        #test_file = file_paths[0]
+        test_file = mpls_path + file_paths
+        logger.info('搜索到需要提取的m2ts文件: ' + test_file)
+        
+        filelist_string = '\n'.join([f"file '{test_file}'"])
         # 将filelist_string写入filelist.txt
         logger.info('搜索到需要提取的m2ts文件: ' + filelist_string)
         with open('/tmp/filelist.txt', 'w') as file:
             file.write(filelist_string)
             
-        # 提取流程
-        # 分析m2ts文件，提取视频流和音频流信息
-        test_file = file_paths[0]
         probe = ffmpeg.probe(test_file)
         video_streams = [stream for stream in probe['streams'] if stream['codec_type'] == 'video']
         audio_streams = [stream for stream in probe['streams'] if stream['codec_type'] == 'audio']
@@ -319,7 +346,7 @@ class BDRemuxermod(_PluginBase):
         else:
             logger.info('成功提取BDMV。')
     
-
+        
     def get_all_m2ts(self,mpls_path) -> list:
         """
         Get all useful m2ts file paths from mpls file
@@ -346,9 +373,29 @@ class BDRemuxermod(_PluginBase):
                 if play_items:
                     return play_items
         return play_items
+    def get_max_m2ts(self,mpls_path):
+        """
+        Get max size m2ts file
+        """
+        largest_size = -1 # 初始化为-1表示没有任何文件
+        largest_filename = ""
+    
+        for filename in os.listdir(mpls_path):
+            filepath = os.path.join(mpls_path, filename)
+        
+            if os.path.isfile(filepath): # 只处理文件而不包括子目录
+                filesize = os.stat(filepath).st_size
+            
+                if filesize > largest_size:
+                    largest_size = filesize
+                    largest_filename = filename
+        return largest_filename
+    def schedlerremux_sub(self,bd_path : str):
+        thread = threading.Thread(target=self.extract_sub, args=(bd_path,))
+        thread.start()
     def schedlerremux(self,bd_path : str):
         thread = threading.Thread(target=self.extract, args=(bd_path,))
-        thread.start()
+        thread.start()        
     def check_files(self,directory, extension):
         files = os.listdir(directory)
         for file in files:
@@ -361,41 +408,51 @@ class BDRemuxermod(_PluginBase):
         return False    
     @eventmanager.register(EventType.TransferComplete)
     def remuxer(self, event):
+        logger.info('传输完毕触发')
+        return
         if not self._enabled:
+            logger.info('未使能')
             return
-        def __to_dict(_event):
-            """
-            递归将对象转换为字典
-            """
-            if isinstance(_event, dict):
-                for k, v in _event.items():
-                    _event[k] = __to_dict(v)
-                return _event
-            elif isinstance(_event, list):
-                for i in range(len(_event)):
-                    _event[i] = __to_dict(_event[i])
-                return _event
-            elif isinstance(_event, tuple):
-                return tuple(__to_dict(list(_event)))
-            elif isinstance(_event, set):
-                return set(__to_dict(list(_event)))
-            elif hasattr(_event, 'to_dict'):
-                return __to_dict(_event.to_dict())
-            elif hasattr(_event, '__dict__'):
-                return __to_dict(_event.__dict__)
-            elif isinstance(_event, (int, float, str, bool, type(None))):
-                return _event
-            else:
-                return str(_event)
-            
-        raw_data = __to_dict(event.event_data)
+        logger.info('1')
+        item = event.event_data
+        logger.info('2')
+        if not item:
+            logger.info('event data error')
+            logger.info(item)
+            return
+        logger.info('3')            
+        # 媒体信息
+        item_media: MediaInfo = item.get("mediainfo")
+        # 转移信息
+        logger.info('4')
+        item_transfer: TransferInfo = item.get("transferinfo")
+        # 类型
+        logger.info('5')
+        item_type = item_media.type
+        # 目的路径
+        logger.info('6')
+        item_dest: Path = item_transfer.target_path
+        # 是否蓝光原盘
+        logger.info('7')
+        item_bluray = item_transfer.is_bluray
+        # 文件清单
+        logger.info('8')
+        item_file_list = item_transfer.file_list_new  
+        logger.info('9')
+        if not item_bluray:
+            logger.info('非蓝光原盘')
+            return        
+        logger.info('11')    
+        bd_path = item_dest.resolve()
+        logger.info('12')
         #logger.info(raw_data)
-        target_file = raw_data.get("transferinfo").get("file_list_new")[0]
-        bd_path = os.path.dirname(target_file)
+        #target_file = raw_data.get("transferinfo").get("file_list_new")[0]
+        #bd_path = os.path.dirname(target_file)
         # 检查是否存在BDMV文件夹
         if not os.path.exists(bd_path + '/BDMV'):
             logger.warn('失败。找不到BDMV文件夹: ' + bd_path)
             return
+        logger.info('13')    
         # 提取流程
         # thread = threading.Thread(target=self.extract, args=(bd_path,))
         # thread.start()
@@ -405,6 +462,7 @@ class BDRemuxermod(_PluginBase):
                                 run_date=datetime.now(tz=pytz.timezone(settings.TZ)) + timedelta(minutes=float(self._delaymin)),
                                 args=(bd_path,))
         # 启动任务
+        logger.info('14')
         if self._scheduler.get_jobs():
             self._scheduler.print_jobs()
             self._scheduler.start()
