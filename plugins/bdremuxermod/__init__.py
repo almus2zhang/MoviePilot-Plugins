@@ -38,9 +38,9 @@ class BDRemuxermod(_PluginBase):
     # 主题色
     plugin_color = "#3B5E8E"
     # 插件版本
-    plugin_version = "1.1.1"
+    plugin_version = "1.1.2"
     # 插件作者
-    plugin_author = "hankun"
+    plugin_author = "hankun and almus"
     # 作者主页
     author_url = "https://github.com/almus2zhang/MoviePilot-Plugins"
     # 插件配置项ID前缀
