@@ -16,6 +16,7 @@ from datetime import datetime, timedelta
 import time
 import pytz
 from app.core.config import settings
+import paramiko
 
 try:
     from pyparsebluray import mpls
@@ -54,23 +55,41 @@ class BDRemuxermod(_PluginBase):
     _delete = False
     _run_once = False
     _path = ""
+    _temppath = ""
+    _outpath = ""
+    _isooutpath = ""
+    _isopath = ""
     _delaymin = 0
     _scheduler: Optional[BackgroundScheduler] = None
     _mkvfile = ""
+    _hostip = ""
+    _hostroot = ""
+    _hostpass = ""
+    _hostheader = ""
     def init_plugin(self, config: dict = None):
         if config:
             self._enabled = config.get("enabled")
             self._delete = config.get("delete")
             self._run_once = config.get("run_once")
             self._path = config.get("path")
+            self._temppath = config.get("temppath")
             self._delaymin = config.get("delaymin") or 0
+            self._outpath = config.get("outpath")
+            self._isooutpath = config.get("isooutpath")
+            self._isopath = config.get("isopath")
+            self._emount = config.get("emount")
+            self._eumount = config.get("eumount")
+            self._hostip = config.get("hostip")
+            self._hostroot = config.get("hostroot")
+            self._hostpass = config.get("hostpass")
+            self._hostheader = config.get("hostheader")
         if self._enabled:
             self._scheduler = BackgroundScheduler(timezone=settings.TZ)
             logger.info("BD Remuxer 插件初始化完成")
             if self._run_once:
-                logger.info("添加任务10秒后处理目录：" + self._path)
+                logger.info("添加任务3秒后处理目录：" + self._path)
                 self._scheduler.add_job(self.schedlerremux_sub, 'date', 
-                                        run_date=datetime.now(tz=pytz.timezone(settings.TZ)) + timedelta(seconds=10),
+                                        run_date=datetime.now(tz=pytz.timezone(settings.TZ)) + timedelta(seconds=3),
                                         args=(self._path,))
                 # 启动任务
                 if self._scheduler.get_jobs():
@@ -78,13 +97,45 @@ class BDRemuxermod(_PluginBase):
                     self._scheduler.start()
                 #thread = threading.Thread(target=self.extract, args=(self._path,))
                 #thread.start()
-                self.update_config({
-                    "enabled": self._enabled,
-                    "delete": self._delete,
-                    "run_once": False,
-                    "path": self._path,
-                    "delaymin": self._delaymin,
-                })
+            if self._emount:
+                logger.info("添加任务3秒后挂载iso")
+                self._scheduler.add_job(self.schedlerisomount, 'date', 
+                                        run_date=datetime.now(tz=pytz.timezone(settings.TZ)) + timedelta(seconds=3),
+                                        args=(self._isopath,self._isooutpath,))
+                # 启动任务
+                if self._scheduler.get_jobs():
+                    self._scheduler.print_jobs()
+                    self._scheduler.start()
+                #thread = threading.Thread(target=self.extract, args=(self._path,))
+                #thread.start()
+            if self._eumount and not self._emount:
+                logger.info("添加任务3秒后卸载iso")
+                self._scheduler.add_job(self.schedlerisoumount, 'date', 
+                                        run_date=datetime.now(tz=pytz.timezone(settings.TZ)) + timedelta(seconds=3),
+                                        args=(self._isooutpath,))
+                # 启动任务
+                if self._scheduler.get_jobs():
+                    self._scheduler.print_jobs()
+                    self._scheduler.start()
+                #thread = threading.Thread(target=self.extract, args=(self._path,))
+                #thread.start()            
+            self.update_config({
+                "enabled": self._enabled,
+                "delete": self._delete,
+                "run_once": False,
+                "path": self._path,
+                "temppath": self._temppath,
+                "delaymin": self._delaymin,
+                "outpath": self._outpath,
+                "isopath": self._isopath,
+                "isooutpath": self._isooutpath,
+                "emount": False,
+                "eumount": False,
+                "hostip": self._hostip,
+                "hostroot": self._hostroot,
+                "hostpass": self._hostpass,
+                "hostheader": self._hostheader,
+            })
 
     def get_state(self) -> bool:
         return self._enabled
@@ -114,7 +165,7 @@ class BDRemuxermod(_PluginBase):
                                 'component': 'VCol',
                                 'props': {
                                     'cols': 12,
-                                    'md': 6
+                                    'md': 4
                                 },
                                 'content': [
                                     {
@@ -130,7 +181,7 @@ class BDRemuxermod(_PluginBase):
                                 'component': 'VCol',
                                 'props': {
                                     'cols': 12,
-                                    'md': 6
+                                    'md': 4
                                 },
                                 'content': [
                                     {
@@ -138,6 +189,196 @@ class BDRemuxermod(_PluginBase):
                                         'props': {
                                             'model': 'delete',
                                             'label': '删除原始文件',
+                                        }
+                                    }
+                                ]
+                            },
+                            {
+                                'component': 'VCol',
+                                'props': {
+                                    'cols': 12,
+                                    'md': 4
+                                },
+                                'content': [
+                                     {
+                                        'component': 'VSwitch',
+                                        'props': {
+                                            'model': 'run_once',
+                                            'label': '指定目录运行一次',
+                                        }
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        'component': 'VRow',
+                        'content': [
+                            {
+                                'component': 'VCol',
+                                'props': {
+                                    'cols': 12,
+                                    'md': 6
+                                },
+                                'content': [
+                                    {
+                                        'component': 'VTextarea',
+                                        'props': {
+                                            'model': 'path',
+                                            'label': '手动指定BDMV文件夹路径,结尾加/ A会遍历所有子目录处理',
+                                            'rows': 1,
+                                            'placeholder': '路径指向BDMV父文件夹',
+                                        }
+                                    }
+                                ]
+                            },
+                            {
+                                'component': 'VCol',
+                                'props': {
+                                    'cols': 12,
+                                    'md': 6
+                                },
+                                'content': [
+                                    {
+                                        'component': 'VTextField',
+                                        'props': {
+                                            'model': 'delaymin',
+                                            'label': '入库后延时处理时间（分钟）',
+                                            'placeholder': '0'
+                                        }
+                                    }
+                                ]
+                            },
+                            {
+                                'component': 'VCol',
+                                'props': {
+                                    'cols': 12
+                                },
+                                'content': [
+                                    {
+                                        'component': 'VTextarea',
+                                        'props': {
+                                            'model': 'temppath',
+                                            'label': 'mkv临时路径,为空不启用，不能和处理路径跨盘，建议设置，避免未完成的文件被识别转移',
+                                            'rows': 1,
+                                            'placeholder': '指定生成mkv的临时目录，避免未生成完毕就开始识别转移',
+                                        }
+                                    }
+                                ]
+                            },
+                            {
+                                'component': 'VCol',
+                                'props': {
+                                    'cols': 12
+                                },
+                                'content': [
+                                    {
+                                        'component': 'VTextarea',
+                                        'props': {
+                                            'model': 'outpath',
+                                            'label': '输出目录，不设定则输出在原盘目录，原盘目录只读时需要设定',
+                                            'rows': 1,
+                                            'placeholder': '原盘目录只读时需要设定',
+                                        }
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        'component': 'VDivider'
+                    },
+                    {
+                        'component': 'VRow',
+                        'content': [
+                            {
+                                'component': 'VCol',
+                                'props': {
+                                    'cols': 12,
+                                    'md': 4
+                                },
+                                'content': [
+                                    {
+                                        'component': 'VSwitch',
+                                        'props': {
+                                            'model': 'emount',
+                                            'label': '挂载iso',
+                                        }
+                                    }
+                                ]
+                            },
+                            {
+                                'component': 'VCol',
+                                'props': {
+                                    'cols': 12,
+                                    'md': 4
+                                },
+                                'content': [
+                                    {
+                                        'component': 'VSwitch',
+                                        'props': {
+                                            'model': 'eumount',
+                                            'label': '卸载iso',
+                                        }
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        'component': 'VRow',
+                        'content': [
+                            {
+                                'component': 'VCol',
+                                'props': {
+                                    'cols': 12,
+                                    'md': 4
+                                },
+                                'content': [
+                                    {
+                                        'component': 'VTextarea',
+                                        'props': {
+                                            'model': 'hostip',
+                                            'label': 'Host IP',
+                                            'rows': 1,
+                                            'placeholder': '172.17.0.1',
+                                        }
+                                    }
+                                ]
+                            },
+                            {
+                                'component': 'VCol',
+                                'props': {
+                                    'cols': 12,
+                                    'md': 4
+                                },
+                                'content': [
+                                    {
+                                        'component': 'VTextarea',
+                                        'props': {
+                                            'model': 'hostroot',
+                                            'label': 'Host root权限用户',
+                                            'rows': 1,
+                                            'placeholder': 'root',
+                                        }
+                                    }
+                                ]
+                            },
+                            {
+                                'component': 'VCol',
+                                'props': {
+                                    'cols': 12,
+                                    'md': 4
+                                },
+                                'content': [
+                                    {
+                                        'component': 'VTextarea',
+                                        'props': {
+                                            'model': 'hostpass',
+                                            'v-model': 'password',
+                                            'label': 'Host root权限用户密码',
+                                            'rows': 1,
+                                            'placeholder': 'pass',
                                         }
                                     }
                                 ]
@@ -156,40 +397,46 @@ class BDRemuxermod(_PluginBase):
                                     {
                                         'component': 'VTextarea',
                                         'props': {
-                                            'model': 'path',
-                                            'label': '手动指定BDMV文件夹路径',
+                                            'model': 'isopath',
+                                            'label': '指定扫描.iso文件路径,挂载内容需重启MP才会生效',
                                             'rows': 1,
-                                            'placeholder': '路径指向BDMV父文件夹 结尾加/ A会遍历所有子目录处理',
+                                            'placeholder': ' ',
                                         }
                                     }
                                 ]
                             },
                             {
                                 'component': 'VCol',
+                                'props': {
+                                    'cols': 12,
+                                    'md': 6
+                                },
                                 'content': [
-                                     {
-                                        'component': 'VSwitch',
+                                    {
+                                        'component': 'VTextarea',
                                         'props': {
-                                            'model': 'run_once',
-                                            'label': '提取指定目录BDMV运行一次',
+                                            'model': 'isooutpath',
+                                            'label': 'iso挂载目录',
+                                            'rows': 1,
+                                            'placeholder': ' ',
                                         }
                                     }
                                 ]
-                            }
-                        ]
-                    },
-                    {
-                        'component': 'VRow',
-                        'content': [
+                            },
                             {
                                 'component': 'VCol',
+                                'props': {
+                                    'cols': 12,
+                                    'md': 6
+                                },
                                 'content': [
                                     {
-                                        'component': 'VTextField',
+                                        'component': 'VTextarea',
                                         'props': {
-                                            'model': 'delaymin',
-                                            'label': '入库后延时处理时间（分钟）',
-                                            'placeholder': '0'
+                                            'model': 'hostheader',
+                                            'label': '转换关系，:分割，比如/movie4:/volume2/movie4',
+                                            'rows': 1,
+                                            'placeholder': 'MP目录:HOST对应目录',
                                         }
                                     }
                                 ]
@@ -220,12 +467,133 @@ class BDRemuxermod(_PluginBase):
             "enabled": False,
             "delete": False,
             "path": "",
+            "temppath": "",
             "run_once": False,
-            "delaymin": 0
+            "delaymin": 0,
+            "outpath": "",
+            "isopath": "",
+            "isooutpath": "",
+            "emount": False,
+            "eumount": False,	
+            "hostip": "",
+            "hostroot": "",
+            "hostpass": "",
+            "hostheader": "",
         }
 
     def get_page(self) -> List[dict]:
         pass
+    def mount_iso(self,isoname,mpoint,header):
+        if not os.path.exists(mpoint):
+            try:
+                logger.info('目录不存在，创建:' + mpoint)
+                os.makedirs(mpoint)
+            except OSError as e:
+                logger.error(e)
+        else:
+            logger.info('目录:' + mpoint + '存在')
+        ssh = paramiko.SSHClient()
+        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        ssh.connect(hostname=self._hostip,port=22,username=self._hostroot,password=self._hostpass)
+        hostheader = header.split(':')[1]
+        mpheader = header.split(':')[0]
+        if mpheader:
+            if isoname.find(mpheader) == -1:
+                logger.warn('ISO目录不包含：' + mpheader)
+                return
+            if mpoint.find(mpheader) == -1:
+                logger.warn('挂载点目录不包含：' + mpheader)
+                return    
+            cmdisoname = isoname.replace(mpheader, hostheader, 1)
+            cmdmpoint = mpoint.replace(mpheader, hostheader, 1)
+        else:
+            cmdisoname = hostheader + isoname	
+            cmdmpoint = hostheader + mpoint
+        #mountcmd = 'mount -o ro \"' + header + isoname +'\" "' + header + mpoint +'\"'
+        mountcmd = 'mount -o ro \"' + cmdisoname +'\" "' + cmdmpoint +'\"'
+        logger.info('挂载命令：' + mountcmd)
+        #'mount -o ro "/volume4/movie4/video/movie/Limbo.iso" "/volume4/movie4/video/movie/testiso"'
+        stdin,stdout,stderr = ssh.exec_command(mountcmd)
+        result = stdout.read().decode()
+        reerr = stderr.read()
+        if result:
+            logger.info('挂载结果：' + str(result))
+        if reerr:
+            logger.info('挂载错误：' + str(reerr))
+        ssh.close()
+    def unmountiso(self,mpoint,header):
+        # 实例化一个transport对象
+        trans = paramiko.Transport((self._hostip, 22))
+        # 建立连接
+        trans.connect(username=self._hostroot, password=self._hostpass)
+    
+        # 将sshclient的对象的transport指定为以上的trans
+        ssh = paramiko.SSHClient()
+        ssh._transport = trans
+        # 执行命令，和传统方法一样
+        #  stdin, stdout, stderr = ssh.exec_command('df -hl')
+        #  print(stdout.read().decode())
+    
+        # 关闭连接
+        #  trans.close()
+    
+        #  ssh = paramiko.SSHClient()
+        #  ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        #  ssh.connect(hostname='192.168.10.222',port=22,username='admin',password='5b6cs1')
+        hostheader = header.split(':')[1]
+        mpheader = header.split(':')[0]
+        if mpheader:
+            if mpoint.find(mpheader) == -1:
+                logger.warn('挂载点目录不包含：' + mpheader)
+                return    
+            cmdmpoint = mpoint.replace(mpheader, hostheader, 1)
+        else:
+            cmdmpoint = hostheader + mpoint
+        umountcmd = 'umount \"' + cmdmpoint +'\"'    
+        #umountcmd = 'umount \"' + header + mpoint +'\"'
+        logger.info('卸载命令：' + umountcmd)
+        #'mount -o ro "/movie4/video/movie/Limbo.iso" "/movie4/video/movie/testiso"'
+        stdin,stdout,stderr = ssh.exec_command(umountcmd)
+        result = stdout.read().decode()
+        reerr = stderr.read()
+        if result:
+            logger.info('卸载结果：' + str(result))
+        if reerr:
+            logger.info('卸载错误：' + str(reerr))
+        trans.close() 
+    def isomount(self,isopath,isooutpath):
+        logger.info("搜索iso目录：" + self._isopath)
+        logger.info("挂载点目录：" + self._isooutpath)
+        header = self._hostheader
+        for root, dirs, files in os.walk(isopath):
+            for file in files:
+                if file.endswith('.iso') or file.endswith('.ISO'):
+                    mpath = os.path.join(root, file)
+                    mpointpath = os.path.join(isooutpath, file[:-4])
+                    self.mount_iso(mpath,mpointpath,header)
+                    if not self._enabled:
+                        logger.info('未使能，中断处理')
+                        return
+        logger.info('挂载iso处理完毕')
+    def isoumount(self,isooutpath):
+        logger.info("卸载挂载点目录：" + isooutpath)     
+        files = os.listdir(isooutpath)
+        header = self._hostheader
+        for file in files:
+            if os.path.isfile(os.path.join(isooutpath, file)):
+                logger.info('文件跳过：' + file)
+            if os.path.isdir(os.path.join(isooutpath, file)):
+                logger.info('卸载目录：' + file)
+                umpath = os.path.join(isooutpath, file)
+                self.unmountiso(umpath,header)
+                dirlens = os.listdir(umpath)
+                if len(dirlens) == 0:
+                    os.rmdir(umpath)
+                if not self._enabled:
+                    logger.info('未使能，中断处理')
+                    return
+        logger.info('卸载iso处理完毕')
+
     def extract_sub(self,path : str):
         if path.endswith('/ A'):
             # 获取所有子目录
@@ -238,15 +606,28 @@ class BDRemuxermod(_PluginBase):
                 logger.info('处理目录：' + allfile)
                 self.extract(allfile)
                 if not self._enabled:
-                  logger.info('未使能，中断处理')
-                  return
+                    logger.info('未使能，中断处理')
+                    return
+            logger.info('处理子目录结束：' + path)
         else:
-            logger.info('处理单独目录：' + path)
+            logger.info('处理单独目录：' + newpath)
             self.extract(path)
     def extract(self,bd_path : str):
         logger.info('开始提取BDMV。')
-        output_name = os.path.basename(bd_path) + ".mkv"
-        output_name = os.path.join(bd_path, output_name)
+        if self._outpath:
+            outdir = os.path.join(self._outpath, os.path.basename(bd_path))
+            if not os.path.exists(outdir):
+                logger.info('输出目录不存在，创建:' + outdir)
+                try:
+                    os.makedirs(outdir)
+                except:
+                    logger.warn('目录创建失败')
+            output_name = os.path.basename(bd_path) + "-BDRem.mkv"
+            output_name = os.path.join(outdir, output_name)
+        else:
+            outdir = bd_path
+            output_name = os.path.basename(bd_path) + "-BDRem.mkv"
+            output_name = os.path.join(bd_path, output_name)
         bdmv_path = bd_path + '/BDMV'
         if not os.path.exists(bdmv_path):
             logger.info('失败。输入路径不存在BDMV文件夹')
@@ -265,7 +646,7 @@ class BDRemuxermod(_PluginBase):
         if os.path.exists(output_name):
             logger.info('失败。输出文件已存在' + output_name)
             return
-        if self.check_files(bd_path,'mkv'):
+        if self.check_files(outdir,'mkv'):
             logger.info('失败。文件已存在' + self._mkvfile)
             return
         #filelist_string = '\n'.join([f"file '{file}'" for file in file_paths])
@@ -273,7 +654,32 @@ class BDRemuxermod(_PluginBase):
         #logger.info('搜索到需要提取的m2ts文件: ' + filelist_string)
         #with open('/tmp/filelist.txt', 'w') as file:
         #    file.write(filelist_string)
-            
+        usetemppath = False
+        tmp_output = output_name
+        if self._temppath:
+            if self._temppath[0] == '/':
+                if self._temppath[:self._temppath.find('/',1)] == bd_path[:bd_path.find('/',1)]:
+                    try:
+                        os.makedirs(self._temppath)
+                    except:
+                        pass
+                    tmp_output = os.path.join(self._temppath, 'tmp_bdremuxer.mkv')
+                    usetemppath = True
+                else:
+                    logger.info('临时目录和处理目录跨盘')
+            else:
+                logger.info('临时目录不是/开头，不启用临时目录：' + self._temppath) 
+        else:
+            logger.info('临时目录为空，不启用临时目录')
+        if usetemppath:
+            logger.info('采用临时目录：' + self._temppath)
+        else:
+            logger.info('不采用临时目录')
+        logger.info('输出文件：' + tmp_output)
+        
+        if os.path.exists(tmp_output):
+            logger.info('删除文件：'+tmp_output)
+            os.remove(tmp_output)
         # 提取流程
         # 分析m2ts文件，提取视频流和音频流信息
         #test_file = file_paths[0]
@@ -326,7 +732,7 @@ class BDRemuxermod(_PluginBase):
                 safe=0, 
                 )
             .output(
-                output_name,
+                tmp_output,
                 vcodec='copy',
                 **dict,
                 map='0',  # 映射所有输入流
@@ -338,9 +744,28 @@ class BDRemuxermod(_PluginBase):
         except ffmpeg.Error as e:
             logger.error(e.stderr)
             logger.info('失败。')
+            if os.path.exists(tmp_output):
+                os.remove(tmp_output)
+            try:
+                log_file = open(os.path.join('/config', 'bdoutlist.log'),'a')
+                log_file.write('失败 ' + output_name + ' \n')
+                log_file.close()
+            except:
+                logger.info('写入log文件失败')
             return
-        # 删除原始文件
+        # remuxer成功，移动到目标目录  
+        try:  
+            os.rename(tmp_output,output_name)
+        except:
+            logger.warn('转移失败' + tmp_output + ' to ' + output_name)
+        try:
+            log_file = open(os.path.join('/config', 'bdoutlist.log'),'a')
+            log_file.write('成功 ' + output_name + '\n')
+            log_file.close()
+        except:
+            logger.info('写入log文件失败')
         if self._delete:
+        # 删除原始文件
             shutil.rmtree(bd_path)
             logger.info('成功提取BDMV。并删除原始文件。')
         else:
@@ -390,6 +815,12 @@ class BDRemuxermod(_PluginBase):
                     largest_size = filesize
                     largest_filename = filename
         return largest_filename
+    def schedlerisomount(self,isopath : str,isooutpath : str):
+        thread = threading.Thread(target=self.isomount, args=(isopath,isooutpath,))
+        thread.start()
+    def schedlerisoumount(self,isooutpath : str):
+        thread = threading.Thread(target=self.isoumount, args=(isooutpath,))
+        thread.start()
     def schedlerremux_sub(self,bd_path : str):
         thread = threading.Thread(target=self.extract_sub, args=(bd_path,))
         thread.start()
@@ -406,7 +837,7 @@ class BDRemuxermod(_PluginBase):
     
         logger.info("目录" + directory + "中不存在后缀为." + extension + "的文件")
         return False    
-    @eventmanager.register(EventType.TransferComplete)
+    #@eventmanager.register(EventType.TransferComplete)
     def remuxer(self, event):
         logger.info('传输完毕触发')
         return
