@@ -5,6 +5,7 @@ from pathlib import Path
 from app.plugins import _PluginBase
 from app.core.event import eventmanager
 from app.schemas.types import EventType
+from app.schemas import Notification, NotificationType, TorrentInfo
 from app.utils.system import SystemUtils
 from typing import Optional, Any, List, Dict, Tuple
 import subprocess
@@ -54,6 +55,9 @@ class BDRemuxermod(_PluginBase):
     _enabled = False
     _delete = False
     _run_once = False
+    _emount = False
+    _eumount = False
+    _notify = False
     _path = ""
     _temppath = ""
     _outpath = ""
@@ -79,6 +83,7 @@ class BDRemuxermod(_PluginBase):
             self._isopath = config.get("isopath")
             self._emount = config.get("emount")
             self._eumount = config.get("eumount")
+            self._notify = config.get("notify")
             self._hostip = config.get("hostip")
             self._hostroot = config.get("hostroot")
             self._hostpass = config.get("hostpass")
@@ -135,6 +140,7 @@ class BDRemuxermod(_PluginBase):
                 "hostroot": self._hostroot,
                 "hostpass": self._hostpass,
                 "hostheader": self._hostheader,
+                "notify": self._notify,
             })
 
     def get_state(self) -> bool:
@@ -200,11 +206,11 @@ class BDRemuxermod(_PluginBase):
                                     'md': 4
                                 },
                                 'content': [
-                                     {
+                                    {
                                         'component': 'VSwitch',
                                         'props': {
-                                            'model': 'run_once',
-                                            'label': '指定目录运行一次',
+                                            'model': 'notify',
+                                            'label': '发送通知',
                                         }
                                     }
                                 ]
@@ -291,6 +297,22 @@ class BDRemuxermod(_PluginBase):
                     {
                         'component': 'VRow',
                         'content': [
+                            {
+                                'component': 'VCol',
+                                'props': {
+                                    'cols': 12,
+                                    'md': 4
+                                },
+                                'content': [
+                                     {
+                                        'component': 'VSwitch',
+                                        'props': {
+                                            'model': 'run_once',
+                                            'label': '指定目录运行一次',
+                                        }
+                                    }
+                                ]
+                            },
                             {
                                 'component': 'VCol',
                                 'props': {
@@ -520,6 +542,22 @@ class BDRemuxermod(_PluginBase):
             logger.info('挂载结果：' + str(result))
         if reerr:
             logger.info('挂载错误：' + str(reerr))
+            if self._notify:
+                self.chain.post_message(Notification(
+                    mtype=NotificationType.SiteMessage,
+                    title=f"【ISO挂载失败】",
+                    text=f"ISO文件：{cmdisoname}\n"
+                         f"挂载点：{cmdmpoint}\n"
+                         f"信息：{reerr}"
+                ))
+        else:
+            if self._notify:
+                self.chain.post_message(Notification(
+                    mtype=NotificationType.SiteMessage,
+                    title=f"【ISO挂载成功】",
+                    text=f"ISO文件：{cmdisoname}\n"
+                         f"挂载点：{cmdmpoint}"
+                ))
         ssh.close()
     def unmountiso(self,mpoint,header):
         # 实例化一个transport对象
@@ -560,6 +598,20 @@ class BDRemuxermod(_PluginBase):
             logger.info('卸载结果：' + str(result))
         if reerr:
             logger.info('卸载错误：' + str(reerr))
+            if self._notify:
+                self.chain.post_message(Notification(
+                    mtype=NotificationType.SiteMessage,
+                    title=f"【ISO卸载失败】",
+                    text=f"挂载点：{cmdmpoint}\n"
+                         f"信息：{reerr}"
+                ))            
+        else:
+            if self._notify:
+                self.chain.post_message(Notification(
+                mtype=NotificationType.SiteMessage,
+                title=f"【ISO卸载成功】",
+                text=f"挂载点：{cmdmpoint}"
+                ))
         trans.close() 
     def isomount(self,isopath,isooutpath):
         logger.info("搜索iso目录：" + self._isopath)
@@ -575,6 +627,7 @@ class BDRemuxermod(_PluginBase):
                         logger.info('未使能，中断处理')
                         return
         logger.info('挂载iso处理完毕')
+        logger.info('重启MP后目录刷新')
     def isoumount(self,isooutpath):
         logger.info("卸载挂载点目录：" + isooutpath)     
         files = os.listdir(isooutpath)
@@ -593,6 +646,7 @@ class BDRemuxermod(_PluginBase):
                     logger.info('未使能，中断处理')
                     return
         logger.info('卸载iso处理完毕')
+        logger.info('重启MP后目录刷新')
 
     def extract_sub(self,path : str):
         if path.endswith('/ A'):
@@ -752,6 +806,12 @@ class BDRemuxermod(_PluginBase):
                 log_file.close()
             except:
                 logger.info('写入log文件失败')
+            if self._notify:
+                self.chain.post_message(Notification(
+                mtype=NotificationType.SiteMessage,
+                title=f"【BD Remux 失败】",
+                text=f"文件：{output_name}"
+                ))
             return
         # remuxer成功，移动到目标目录  
         try:  
@@ -764,6 +824,12 @@ class BDRemuxermod(_PluginBase):
             log_file.close()
         except:
             logger.info('写入log文件失败')
+        if self._notify:
+            self.chain.post_message(Notification(
+            mtype=NotificationType.SiteMessage,
+            title=f"【BD Remux 成功】",
+            text=f"文件：{output_name}"
+            ))
         if self._delete:
         # 删除原始文件
             shutil.rmtree(bd_path)
