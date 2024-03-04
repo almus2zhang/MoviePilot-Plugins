@@ -90,7 +90,6 @@ class BDRemuxermod(_PluginBase):
             self._hostheader = config.get("hostheader")
         if self._enabled:
             self._scheduler = BackgroundScheduler(timezone=settings.TZ)
-            logger.info("BD Remuxer 插件初始化完成")
             if self._run_once:
                 logger.info("添加任务3秒后处理目录：" + self._path)
                 self._scheduler.add_job(self.schedlerremux_sub, 'date', 
