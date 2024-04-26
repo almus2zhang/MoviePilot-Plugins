@@ -13,6 +13,7 @@ MoviePilot官方插件市场：https://github.com/jxxghp/MoviePilot-Plugins
 ####  
 
 # 微信交互设置
+- 首先参考[通过CF实现公网访问](https://github.com/almus2zhang/MoviePilot-Plugins/blob/main/CFplusLuck.md "通过CF实现公网访问")
 - 具体设置参考 
 - [mp微信推送教程](https://github.com/hjfzzm/md_files/blob/main/Movie-Pilot%E9%83%A8%E7%BD%B2%E4%B8%8E%E5%BE%AE%E4%BF%A1%E6%8E%A8%E9%80%81%E6%95%99%E7%A8%8B.md "mp微信推送教程")
 - 因为前面已经实现了无公网v4的外网访问，所以不需要教程里的VPS以及FRP。
