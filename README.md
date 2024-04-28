@@ -21,3 +21,6 @@ MoviePilot官方插件市场：https://github.com/jxxghp/MoviePilot-Plugins
 - 确保外网可以打开mp。
 - 然后只需要配置企业微信的时候把回调地址改为自己的地址，注意token改为自己的token。
 - https://mp.youdomain.com:8443/api/v1/message/?token=moviepilot
+
+# 我的目录设置说明
+ - [请参考](https://github.com/almus2zhang/MoviePilot-Plugins/blob/main/mysetting.md "请参考")
