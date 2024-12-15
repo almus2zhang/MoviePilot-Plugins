@@ -1,7 +1,6 @@
 # openwrt NATMAP配置
 natmap安装完成后，在服务natmap可以打开配置页面，点击添加
-[[attached/NATMAP 记录自动更新/62057c6967cc98b37735aa346a6fc804_MD5.jpeg|Open: Pasted image 20241215140926.png]]
-![[attached/NATMAP 记录自动更新/62057c6967cc98b37735aa346a6fc804_MD5.jpeg]]
+![[https://github.com/almus2zhang/MoviePilot-Plugins/blob/main/img/PIC20241215140917001.jpg]]
 协议一般是TCP，如果还需要UDP就再加一个
 地址仅IPv4
 接口选择wan
@@ -14,8 +13,7 @@ Bind port随意
 下面填上局域网服务的ip和端口。
 这里面特别注意如果勾选了Forward mode，就不要在防火墙里面加对应的端口转发了。
 创建完毕后启动
-[[attached/NATMAP 记录自动更新/19193f1799cc987c1a51e49bd273c6ad_MD5.jpeg|Open: Pasted image 20241215141722.png]]
-![[attached/NATMAP 记录自动更新/19193f1799cc987c1a51e49bd273c6ad_MD5.jpeg]]
+![[https://github.com/almus2zhang/MoviePilot-Plugins/blob/main/img/PIC20241215140917001.jpg]]
 过一会儿能看到外部ip和端口就是stun打洞成功了。
 这个时候访问 外部ip:外部端口 就可以连到上面转发设置的目标ip:目标端口了。如果无法访问，看一下WAN的防火墙是不是接受入站了。我的OP的WAN防火墙入站总是自己变成拒绝。
 
@@ -24,8 +22,7 @@ Bind port随意
 pip install pystun3  或者 apt install python-pystun3
 然后运行pystun3可以看看NAT类型
 如下就是NAT1了
-[[attached/NATMAP 记录自动更新/04a7d2735dad98af680a6acfad5864fa_MD5.jpeg|Open: Pasted image 20241215141941.png]]
-![[attached/NATMAP 记录自动更新/04a7d2735dad98af680a6acfad5864fa_MD5.jpeg]]
+![[https://github.com/almus2zhang/MoviePilot-Plugins/blob/main/img/PIC20241215140917001.jpg]]
 
 # 搭配Nginx跳转
 以上打洞成功，可以通过外部访问了，但是并不知道外部ip和端口什么时候会变。
