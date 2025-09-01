@@ -1,0 +1,20 @@
+{
+    "KodiLibRefresh": {
+        "name": "KODI库刷新",
+        "description": "媒体库更新后同步让KODI刷新库",
+        "labels": "媒体库",
+        "version": "1.0",
+        "icon": "Kodi_A.png",
+        "author": "almus",
+        "level": 1,
+        "v2": true
+    },
+    "BDRemuxermod": {
+        "name": "BDMV Remuxer mod",
+        "description": "提取蓝光原盘目录，合并为MKV文件。修改自https://github.com/hankunyu",
+        "version": "1.1.2",
+        "icon": "",
+        "author": "hankun and almus",
+        "level": 1
+    }
+}
